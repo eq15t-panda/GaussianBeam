@@ -1,6 +1,7 @@
 import csv
 import numpy as np
 from scipy.optimize import root_scalar
+import os
 
 from matrix import lens, free_space
 
@@ -109,12 +110,11 @@ if __name__ == "__main__":
     # Set distance between curved mirror and origin
     d_c = 125e-3 / 2  # 125 mm divided by 2 is the typical distance found between curved mirrors in a bow-tie ring cavity
 
-    # Open a CSV file to store the results
-    with open("collimation_results.csv", mode="w", newline="") as file:
+    file_exists = os.path.isfile("collimation_results.csv")
+    with open("collimation_results.csv", mode="a", newline="") as file:
         writer = csv.writer(file)
-        # Write the header row
-        writer.writerow(["ROC (mm)", "Focal Length (mm)", "d_lens (mm)", "Waist (microns)", "Wavefront (m)"])
-
+        if not file_exists:
+            writer.writerow(["ROC (mm)", "Focal Length (mm)", "d_lens (mm)", "Waist (microns)", "Wavefront (m)"])
         # Find optimal d_lens for collimation
         for roc in ROC:
             for focal_length in f:

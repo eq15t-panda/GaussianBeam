@@ -57,7 +57,7 @@ for roc, values in data.items():
     plt.plot(focal_lengths, d_lens, marker="o", label=f"ROC = {roc:.1f} mm")
     plt.xlabel("Focal Length (mm)")
     plt.ylabel(r"$d_{lens}$ (mm)")
-    plt.title(r"$d_{{lens}}$ vs. Focal Length for ROC = {:.1f} mm".format(roc))
+    plt.title("$d_{{lens}}$ vs. Focal Length for\n"+r"ROC = {:.1f} mm and $w_0$ = {:.1f} $\mu$m".format(roc, waists[0]))
     # plt.legend()
     plt.grid()
     plt.savefig(f"d_lens_vs_focal_length_ROC_{int(roc)}.png")

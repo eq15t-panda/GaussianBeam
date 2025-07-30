@@ -1,3 +1,4 @@
+import csv
 import numpy as np
 from scipy.optimize import root_scalar
 
@@ -73,7 +74,7 @@ def propagation(d_lens, w0, wavelength, roc, focal_length, d_c):
     return waist, wavefront
 
 
-def find_d_lens(w0, wavelength, roc, focal_length, d_c):
+def find_d_lens(w0, wavelength, roc, focal_length, d_curved):
     """
     Find the distance d_lens for collimation of the Gaussian beam.
 
@@ -81,11 +82,48 @@ def find_d_lens(w0, wavelength, roc, focal_length, d_c):
     :param wavelength: Wavelength of the beam (in meters).
     :param roc: Radius of curvature (in meters).
     :param focal_length: Focal length of the converging lens (in meters).
-    :param d_c: Distance between the curved mirror and the origin (in meters).
+    :param d_curved: Distance between the curved mirror and the origin (in meters).
     :return: Optimal distance d_lens for collimation.
     """
-    result = root_scalar(lambda d_lens: propagation(d_lens, w0, wavelength, roc, focal_length, d_c)[1], bracket=(0.01, 10))
+    result = root_scalar(lambda d_lens: propagation(d_lens, w0, wavelength, roc, focal_length, d_curved)[1],
+                         bracket=(0.01, 10))
     if result.converged:
         return result.root
     else:
         raise ValueError("Root finding did not converge.")
+
+
+if __name__ == "__main__":
+    # Set wavelength for pump and harmonic
+    pump = 780e-9
+    harmonic = pump / 2
+
+    # Set initial beam waist
+    w_blu_opo = 40e-6  # 40 microns
+    w_red_opo = w_blu_opo / np.sqrt(2)
+
+    # Set radii of curvature and focal lengths
+    ROC = np.array([100, 150]) * 1e-3  # 100 mm and 150 mm
+    f = np.array([50, 75, 100, 200, 300, 400, 500]) * 1e-3  # 50 mm to 500 mm
+
+    # Set distance between curved mirror and origin
+    d_c = 125e-3 / 2  # 125 mm divided by 2 is the typical distance found between curved mirrors in a bow-tie ring cavity
+
+    # Open a CSV file to store the results
+    with open("collimation_results.csv", mode="w", newline="") as file:
+        writer = csv.writer(file)
+        # Write the header row
+        writer.writerow(["ROC (mm)", "Focal Length (mm)", "d_lens (mm)", "Waist (microns)", "Wavefront (m)"])
+
+        # Find optimal d_lens for collimation
+        for roc in ROC:
+            for focal_length in f:
+                try:
+                    d_lens = find_d_lens(w_blu_opo, pump, roc, focal_length, d_c)
+                    waist, wavefront = propagation(d_lens, w_blu_opo, pump, roc, focal_length, d_c)
+                    # Write the results to the CSV file
+                    writer.writerow([roc * 1e3, focal_length * 1e3, d_lens * 1e3, waist * 1e6, wavefront])
+                except ValueError as e:
+                    # Optionally, log errors to the CSV or skip them
+                    writer.writerow([roc * 1e3, focal_length * 1e3, "Error", "Error", "Error"])
+

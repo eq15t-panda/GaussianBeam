@@ -30,6 +30,7 @@ df = pd.read_csv("collimation_results.csv")
 
 # Get unique values
 w0_values = sorted(df["w0 (microns)"].unique())
+d_lens = sorted(df["d_lens (mm)"].unique())
 rocs = sorted(df["ROC (mm)"].unique())
 focals = sorted(df["Focal Length (mm)"].unique())
 
@@ -41,9 +42,16 @@ if len(rocs) == 1:
 
 for ax, roc in zip(axes, rocs):
     all_waists = []
-    for w0 in w0_values:
+    all_length = []
+
+    ax2 = ax.twinx()  # Create a second y-axis for d_lens
+
+    for w0, dl in zip(w0_values, d_lens):
+        # Set subset for waist values
         subset = df[(df["ROC (mm)"] == roc) & (df["w0 (microns)"] == w0)]
         subset = subset.sort_values("Focal Length (mm)")
+
+        # Plot waist on the primary y-axis
         ax.plot(
             subset["Focal Length (mm)"],
             subset["Waist (mm)"],
@@ -51,14 +59,36 @@ for ax, roc in zip(axes, rocs):
             linestyle="--",
             label=fr"$w_0$={w0} $\mu$m"
         )
+        # Plot d_lens on the secondary y-axis
+        ax2.plot(
+            subset["Focal Length (mm)"],
+            subset["d_lens (mm)"],
+            marker="x",
+            linestyle=":",
+            label=fr"$d_\mathrm{{lens}}$={dl} mm",
+            color="gray"
+        )
+
+        # Collect all waist and d_lens values for unique y-ticks
         all_waists.extend(subset["Waist (mm)"].values)
+        all_length.extend(subset["d_lens (mm)"].values)
 
+    # Merge close values for unique y-ticks
     unique_waists = sorted(set(all_waists))
-    unique_merged = merge_close_values(unique_waists, tol=0.06)
+    unique_waists_merged = merge_close_values(unique_waists, tol=0.06)
 
-    ax.set_yticks(unique_merged)
-    ax.set_yticklabels([f"{w:.3f}" for w in unique_merged])
+    unique_length = sorted(set(all_length))
+    unique_length_merged = merge_close_values(unique_length, tol=5.)
 
+    # Set y-ticks for waist
+    ax.set_yticks(unique_waists_merged)
+    ax.set_yticklabels([f"{w:.3f}" for w in unique_waists_merged])
+
+    # Set y-ticks for d_lens
+    ax2.set_yticks(unique_length_merged)
+    ax2.set_yticklabels([f"{dl:.3f}" for dl in unique_length_merged])
+
+    ax.set_xticks(focals)
     ax.set_title(f"RoC = {roc} mm")
     ax.set_xlabel("Focal Length (mm)")
     ax.grid(True, linestyle="--", alpha=0.6)

@@ -4,6 +4,7 @@ from scipy.optimize import root_scalar
 import os
 
 from matrix import lens, free_space
+from utils import csv_utils as csvu
 
 
 def gaussian_beam_waist(w0, wavelength, *matrices):
@@ -33,9 +34,7 @@ def gaussian_beam_waist(w0, wavelength, *matrices):
 
     # Apply the ABCD transformation
     q_prime = (A * q + B) / (C * q + D)
-    # print("q:", q)
-    print("q_prime:", q_prime.imag)
-    print("-------------------------")
+
     # Calculate the new beam waist
     w_prime = np.sqrt(-wavelength / (np.pi * np.imag(1 / q_prime)))
     # print(w_prime)
@@ -104,7 +103,7 @@ if __name__ == "__main__":
     harmonic = pump / 2
 
     # Set initial beam waist
-    w_blu_opo = 40e-6  # 40 microns
+    w_blu_opo = 30e-6  # 40 microns
     w_red_opo = w_blu_opo / np.sqrt(2)
 
     # Set radii of curvature and focal lengths
@@ -114,21 +113,20 @@ if __name__ == "__main__":
     # Set distance between curved mirror and origin
     d_c = 125e-3 / 2  # 125 mm divided by 2 is the typical distance found between curved mirrors in a bow-tie ring cavity
 
-    file_exists = os.path.isfile("collimation_results.csv")
-    with open("collimation_results.csv", mode="a", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow(["ROC (mm)", "Focal Length (mm)", "d_lens (mm)", "Waist (microns)", "Wavefront (m)"])
-        # Find optimal d_lens for collimation
-        for roc in ROC:
-            # print("roc changes----------------------")
-            for focal_length in f:
-                print("focal changes ----------------------")
-                try:
-                    d_lens_root = find_d_lens(w_blu_opo, pump, roc, focal_length, d_c)
-                    waist, wavefront = propagation(d_lens_root, w_blu_opo, harmonic, roc, focal_length, d_c)
-                    # Write the results to the CSV file
-                    writer.writerow([roc * 1e3, focal_length * 1e3, d_lens_root * 1e3, waist * 1e3, wavefront])
-                except ValueError as e:
-                    # Optionally, log errors to the CSV or skip them
-                    writer.writerow([roc * 1e3, focal_length * 1e3, "Error", "Error", "Error"])
+    csvu.ensure_header()
+    existing = csvu.read_existing_results()
+
+    for roc in ROC:
+        for focal_length in f:
+            try:
+                d_lens_root = find_d_lens(w_blu_opo, pump, roc, focal_length, d_c)
+                waist, wavefront = propagation(d_lens_root, w_blu_opo, harmonic, roc, focal_length, d_c)
+
+                key = (w_blu_opo * 1e6, roc * 1e3, focal_length * 1e3, d_lens_root * 1e3)
+                if key not in existing:
+                    csvu.append_result(w_blu_opo * 1e6, roc * 1e3, focal_length * 1e3, d_lens_root * 1e3, waist * 1e3, wavefront)
+                    existing.add(key)
+            except ValueError:
+                csvu.append_result(roc * 1e3, focal_length * 1e3, "Error", "Error", "Error")
+
 

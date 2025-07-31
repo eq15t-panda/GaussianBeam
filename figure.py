@@ -1,10 +1,14 @@
-import csv
+import pandas as pd
+
 import matplotlib
 import matplotlib.pyplot as plt
+
 import numpy as np
 
-matplotlib.use("TkAgg")  # Use a compatible backend
+from utils.misc import merge_close_values
 
+
+matplotlib.use("TkAgg")  # or "Qt5Agg" if installed
 # -- Matplotlib parameters -- #
 SMALL_SIZE = 12
 MEDIUM_SIZE = 20
@@ -20,46 +24,48 @@ plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 matplotlib.rcParams['mathtext.fontset'] = 'cm'
 matplotlib.rcParams['font.family'] = 'STIXGeneral'
 
-# Read data from the CSV file
-csv_file = "collimation_results.csv"
-data = {}
 
-with open(csv_file, mode="r") as file:
-    reader = csv.DictReader(file)
-    for row in reader:
-        roc = float(row["ROC (mm)"])
-        focal_length = float(row["Focal Length (mm)"])
-        d_lens = row["d_lens (mm)"]
-        waist = row["Waist (microns)"]
+# Load CSV
+df = pd.read_csv("collimation_results.csv")
 
-        # Skip rows with errors
-        if d_lens == "Error" or waist == "Error":
-            continue
+# Get unique values
+w0_values = sorted(df["w0 (microns)"].unique())
+rocs = sorted(df["ROC (mm)"].unique())
+focals = sorted(df["Focal Length (mm)"].unique())
 
-        d_lens = float(d_lens)
-        waist = float(waist)
+# Create subplots: one for each RoC
+fig, axes = plt.subplots(1, len(rocs), figsize=(14, 5), sharey=False)
 
-        if roc not in data:
-            data[roc] = {"focal_lengths": [], "d_lens": [], "waists": []}
+if len(rocs) == 1:
+    axes = [axes]  # Ensure axes is iterable
 
-        data[roc]["focal_lengths"].append(focal_length)
-        data[roc]["d_lens"].append(d_lens)
-        data[roc]["waists"].append(waist)
+for ax, roc in zip(axes, rocs):
+    all_waists = []
+    for w0 in w0_values:
+        subset = df[(df["ROC (mm)"] == roc) & (df["w0 (microns)"] == w0)]
+        subset = subset.sort_values("Focal Length (mm)")
+        ax.plot(
+            subset["Focal Length (mm)"],
+            subset["Waist (mm)"],
+            marker="o",
+            linestyle="--",
+            label=fr"$w_0$={w0} $\mu$m"
+        )
+        all_waists.extend(subset["Waist (mm)"].values)
 
-# Plot the results
-for roc, values in data.items():
-    focal_lengths = np.array(values["focal_lengths"])
-    d_lens = np.array(values["d_lens"])
-    waists = np.array(values["waists"])
+    unique_waists = sorted(set(all_waists))
+    unique_merged = merge_close_values(unique_waists, tol=0.06)
 
-    # Plot d_lens vs. Focal Length
-    plt.figure()
-    plt.plot(focal_lengths, d_lens, marker="o", label=f"ROC = {roc:.1f} mm")
-    plt.xlabel("Focal Length (mm)")
-    plt.ylabel(r"$d_{lens}$ (mm)")
-    plt.title("$d_{{lens}}$ vs. Focal Length for\n"+r"ROC = {:.1f} mm and $w_0$ = {:.1f} $\mu$m".format(roc, waists[0]))
-    # plt.legend()
-    plt.grid()
-    plt.savefig(f"d_lens_vs_focal_length_ROC_{int(roc)}.png")
+    ax.set_yticks(unique_merged)
+    ax.set_yticklabels([f"{w:.3f}" for w in unique_merged])
 
+    ax.set_title(f"RoC = {roc} mm")
+    ax.set_xlabel("Focal Length (mm)")
+    ax.grid(True, linestyle="--", alpha=0.6)
+    if ax == axes[0]:
+        ax.set_ylabel("Waist (mm)")
+
+axes[0].legend(title="Initial Waist")
+# plt.suptitle(r"Waist evolution for all $w_0$ values")
+plt.tight_layout(rect=[0, 0, 1, 0.95])
 plt.show()
